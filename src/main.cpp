@@ -1,16 +1,15 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
-#define _matrix_class
 using namespace std;
 
 template <class T> class matrix
 {
 private:
-    int s;  // Rozmiar macierzy
-    T* A;      // Elementy
-public:
+    T** A;                                    // Elementy
     int n, m;
+public:
+    matrix(const matrix<T>& other);          // Konstruktor kopiujacy
     matrix(int r, int c);                    // Konstruktor tworzacy macierz nxm
     matrix(int r);                           // Konstruktor tworzacy macierz nxn
     matrix(string filename);                 // Konstruktor tworzacy macierz z pliku po podaniu nazwy utworzy sie plik, do ktorego chcemy wrzucic macierz
@@ -20,64 +19,101 @@ public:
     int rows();                              // Zwraca liczbę wierszy macierzy
     int cols();                              // Zwraca liczbę kolumn macierzy
     void print();                            // Wyswietla macierz
-    void multiply(matrix<T>& a, matrix<T>& b);           //Mnozy dwie macierze
-    void add(matrix<T>& a, matrix<T>& b);               //Dodaje dwie macierze
-    void subtract(matrix<T>& a, matrix<T>& b);          //Odejmuje dwie macierze
-    void store(string filename);                       //Zachowuje w pliku o podanej nazwie, jesli takiego nie ma to go tworzy
+    matrix<T> multiply(const matrix<T>& a);       // Mnozy dwie macierze
+    matrix<T> add(matrix<T>& a);            // Dodaje dwie macierze
+    matrix<T> subtract(matrix<T>& a);       // Odejmuje dwie macierze
+    void store(string filename);             // Zachowuje w pliku o podanej nazwie, jesli takiego nie ma to go tworzy
 };
+template<class T> matrix<T>::matrix(const matrix<T>& other) 
+{
+    n = other.n;
+    m = other.m;
+
+    A = new double* [n];
+    for (int i = 0; i < n; i++)
+        A[i] = new double[m];
+    if (other.A)
+    {
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < m; j++)
+                A[i][j] = other.A[i][j];
+    }
+}
+
 template <class T> matrix<T>::matrix(int r)
 {
     n = r;
     m = r;
-    s = n * m;
-    A = new T[s];
-    for (int i = 0; i < s; i++)
-    {
-        A[i] = 0;
-    }
+    A = new double* [n];
+    for (int i = 0; i < n; i++)
+        A[i] = new double[m];
+
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < m; j++)
+            A[i][j] = 0.0;
 }
 
 template <class T> matrix<T>::matrix(int r, int c)
 {
     n = r;
     m = c;
-    s = n * m;
-    A = new T[s];
-    for (int i = 0; i < s; i++)
-    {
-        A[i] = 0;
-    }
+    A = new double* [n];
+    for (int i = 0; i < n; i++)
+        A[i] = new double[m];
+
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < m; j++)
+            A[i][j] = 0.0;
 }
 
 template <class T> matrix<T>::matrix(string filename)
 {
-    ifstream fin(filename);  // tworzenie pliku o podanej nazwie
+    ifstream fin(filename);
+   
+	    fin >> n >> m;
 
-    //fin.open("dane.txt", ifstream::in);
-    fin >> n >> m;
+	    A = new double* [n];
+	    for (int i = 0; i < n; i++)
+		A[i] = new double[m];
 
-    s = n * m;
+	    for (int i = 0; i < n; i++)
+		for (int j = 0; j < m; j++)
+		    fin >> A[i][j];
 
-    A = new T[s];
-
-    for (int i = 0; i < s; i++) fin >> A[i];
-
-    fin.close();  //wydaje mi sie, ze nie trzeba close, ale nie jestem pewna
+	    fin.close();
+    
 }
 
 template <class T> matrix<T>::~matrix()
 {
+    for (int i = 0; i < n; i++)
+        delete[] A[i];
     delete[] A;
 }
 
 template <class T> T matrix<T>::getv(int r, int c)
 {
-    return A[r * m + c];
+    if ((r >= 0 && r <= n) && (c >= 0 && c <= m))
+    {
+         return A[r][c];
+    }
+    else
+    {
+        cout << "Can't get number of matrix, wrong number of rows or columns size\n" << endl;
+        exit(1);
+    }
 }
 
 template <class T> void matrix<T>::setv(int r, int c, T v)
 {
-    A[r * m + c] = v;
+    if ((r >= 0 && r <= n) && (c >= 0 && c <= m))
+    {
+        A[r][c] = v;
+    }
+    else
+    {
+        cout << "Can't set number of matrix, wrong number of rows or columns size\n" << endl;
+    }
 }
 
 template <class T> int matrix<T>::rows()
@@ -93,95 +129,104 @@ template <class T> int matrix<T>::cols()
 
 template <class T> void matrix<T>::print()
 {
-    cout << "Macierz:" << n << "x" << m << endl;
+
+
+    cout << "Matrix:" << n << "x" << m << endl;
     for (int i = 0; i < n; i++)
     {
         for (int j = 0; j < m; j++)
-            cout << setw(5) << A[i * m + j];
+        {
+            cout << setw(5) << A[i][j];
+        }
         cout << endl;
     }
 }
 
-template <class T> void matrix<T>::multiply(matrix<T>& a, matrix<T>& b)
+template <class T> matrix<T> matrix<T>::multiply(const matrix<T>& a)
 {
-    if (a.m == b.n)
+    T sum = 0;
+    int r = n;
+    int c = a.m;
+    matrix result(r, c);
+    if (m != a.n)
     {
-        T sum;
+        cout << "\nCan't multiply two matrix if number of columns in first matrix not equals to rows of second matrix, change the size\n" << endl;
+        exit(1);
+    }
+    else
+    {
         int i, j, k;
 
         for (i = 0; i < n; i++)
-            for (j = 0; j < m; j++)
+        {
+            for (j = 0; j < a.m; j++)
             {
                 sum = 0;
-                for (k = 0; k < a.m; k++) sum += a.getv(i, k) * b.getv(k, j);
-                A[i * m + j] = sum;
+                for (k = 0; k < m; k++)
+
+                    sum += A[i][k] * (a.A[k][j]);
+
+                result.A[i][j] = sum;
             }
+        }
     }
-    else
-    {
-        cout << "Can't multiply two matrix if number of columns in first matrix not equals to rows of second matrix, change the size" << endl;
-        cout << "The matrix you see on screen is first matrix initiated by constructor" << endl;
-    }
+    return result;
 }
 
-template <class T> void matrix<T>::add(matrix<T>& a, matrix<T>& b)
+template <class T> matrix<T> matrix<T>::add(matrix<T>& a)
 {
-    T sum;
-    int i, j;
-    if ((a.n == b.n) && (a.m == b.m))
+    int r = n;
+    int c = m;
+    matrix result(r, c);
+    if ((n != a.n) || (m != a.m))
     {
-        for (i = 0; i < n; i++)
-            for (j = 0; j < m; j++)
-            {
-                sum = 0;
-                sum += a.getv(i, j) + b.getv(i, j);
-                A[i * m + j] = sum;
-            }
+        cout << "\nCan't add two matrix in another size, change the size\n" << endl;
+        exit(1);
     }
     else
     {
-        cout << "Can't add two matrix in another size, change the size" << endl;
-        cout << "The matrix you see on screen is first matrix initiated by constructor" << endl;
+        for (int i = 0; i < r; i++)
+            for (int j = 0; j < c; j++)
+                result.A[i][j] = (*this).A[i][j] + a.A[i][j];
     }
+    return result;
 }
 
-template <class T> void matrix<T>::subtract(matrix<T>& a, matrix<T>& b)
+template <class T> matrix<T> matrix<T>::subtract(matrix<T>& a)
 {
-    T sum;
-    int i, j;
-    if ((a.n == b.n) && (a.m == b.m))
+    int r = n;
+    int c = m;
+    matrix result(r, c);
+    if ((n != a.n) || (m != a.m))
     {
-        for (i = 0; i < n; i++)
-            for (j = 0; j < m; j++)
-            {
-                sum = 0;
-                sum += a.getv(i, j) - b.getv(i, j);
-                A[i * m + j] = sum;
-            }
+        cout << "\nCan't add two matrix in another size, change the size\n" << endl;
+        exit(1);
     }
     else
     {
-        cout << "Can't subtract two matrix in another size, change the size" << endl;
-        cout << "The matrix you see on screen is first matrix initiated by constructor" << endl;
+        for (int i = 0; i < r; i++)
+            for (int j = 0; j < c; j++)
+                result.A[i][j] = (*this).A[i][j] - a.A[i][j];
     }
+    return result;
 }
+
 template <class T> void matrix<T>::store(string filename)
 {
     ofstream fin(filename);  //tworzy plik o podanej nazwie, jezeli nie istnieje
 
    // fin.open(filename, ifstream::out); // Otwieramy strumień do odczytu, nie potrzebujemy jezeli chcemy tworzyc plik
-    fin << "Macierz:" << n << "x" << m << endl;
+    fin << n << " " << m << endl;
     for (int i = 0; i < n; i++)
     {
         for (int j = 0; j < m; j++)
-            fin << setw(5) << A[i * m + j];
+            fin << setw(5) << A[i][j];
         fin << endl;
     }
 
-    fin.close();   //teoretycznie niepotrzebne fin.close(), ale nie jestem pewna
+    fin.close();   
 }
-// Program główny
-//---------------
+
 
 int main()
 {
@@ -193,88 +238,85 @@ int main()
     cout << "-------------------------------------------------------------------------------------" << endl;
     matrix<double> A(8,4);
     matrix<double> B(4, 8);// A.m == B.n, dla mozliwosc mnozenia tych dwoch macierzy
-    matrix<double> C(A.n, B.m); //wynik mnozenia macierzy A i B
-    matrix<double> D(A.n, A.m); //wynik dodawania macierzy a i b
-    matrix<double> E(A.n, A.m); // wynik odejmowania macierzy a i b
-    cout << "Macierz A: " << endl;
+    cout << "Macierz A: \n" << endl;
     cout << "Metoda rows(); dla macierzy A\t" << A.rows() << endl << endl;
     cout << "Metoda cols(); dla macierzy A\t" << A.cols() << endl << endl;
     A.print(); 
-    cout << "Macierz B: " << endl;
+    cout << "Macierz B: \n" << endl;
     B.print();
-    cout << "Ustawienie elementu macierzy A: r=1, c=1, v=30 " << endl << endl;
+    cout << "Ustawienie elementu macierzy A: r=1, c=1, v=30 \n" << endl << endl;
     A.setv(1, 1, 30.);
     A.print();
-    cout << "Metoda get(); dla macierzy A\t" << A.getv(1, 1) << endl << endl;;
-    cout << "Wynik dodawania macierzy: " << endl;
-    D.add(A, B);
-    D.print();
-    cout << "Wynik odejmowania macierzy: " << endl;
-    E.subtract(A, B);
-    E.print();
-    cout << "Zmiana elementow macierzy, dla lepszego zobrazowania dzialania, nowa macierz A:" << endl;
+    //cout << "Metoda get(); dla macierzy A\t" << endl << endl;
+    //A.getv(1, 100000000); //zly rozmiar
+    //cout << "Wynik dodawania macierzy A i B: \n" << endl; //zly rozmiar macierzy, wyswietla error i exit()
+    //matrix<double> adding(A.add(B));
+    //adding.print();
+    //cout << "Wynik odejmowania macierzy A i B: \n" << endl; //zly rozmiar macierzy, wyswietla error i exit()
+    //matrix<double> subtracting(A.subtract(B));
+    //subtracting.print();
+    cout << "Zmiana elementow macierzy, dla lepszego zobrazowania dzialania, nowa macierz A:\n" << endl;
     for (int i = 0; i < A.rows(); i++)
     {
         for (int j = 0; j < A.cols(); j++)
             A.setv(i, j, 30.);
     }
     A.print();
-    cout << "Zmiana elementow macierzy, dla lepszego zobrazowania dzialania, nowa macierz B:" << endl;
+    cout << "Zmiana elementow macierzy, dla lepszego zobrazowania dzialania, nowa macierz B:\n" << endl;
     for (int i = 0; i < B.rows(); i++)
     {
         for (int j = 0; j < B.cols(); j++)
             B.setv(i, j, 2.);
     }
     B.print();
-    C.multiply(A, B);
-    cout << "Wynik mnozenia macierzy A i B" << endl;
-    C.print();
+   
+    cout << "Wynik mnozenia macierzy A i B\n" << endl;
+    matrix<double> multiplying(A.multiply(B)); //przekazanie macierzy D, ktora jest zwracana podczas operacji do konstruktora kopiujacego
+    multiplying.print();
     cout << endl << endl;
     A.store("Macierz_A.txt"); //tworzy plik i do niego zapisuje
     B.store("Macierz_B.txt");
+
     cout << "-------------------------------------------------------------------------------------" << endl;
     cout << "test 2. zainicjowanie dwoch macierzy kwadratowych n x m gdzie n=m=8 \n";
     cout << "-------------------------------------------------------------------------------------" << endl;
     matrix<double> F(8);
     matrix<double> G(8);
-    matrix<double> H(F.n, G.m); 
-    matrix<double> I(F.n, G.m); 
-    matrix<double> J(F.n, G.m); 
-    cout << "Macierz F: " << endl;
-    cout << "Metoda rows(); dla macierzy A\t" << F.rows() << endl << endl;
-    cout << "Metoda cols(); dla macierzy A\t" << F.cols() << endl << endl;
+   
+    cout << "Macierz F: \n" << endl;
+    cout << "Metoda rows(); dla macierzy F\t" << F.rows() << endl << endl;
+    cout << "Metoda cols(); dla macierzy F\t" << F.cols() << endl << endl;
     F.print();
-    cout << "Macierz G: " << endl;
+    cout << "Macierz G: \n" << endl;
     G.print();
-    cout << "Ustawienie elementu macierzy F: r=1, c=1, v=30 " << endl << endl;
+    cout << "Ustawienie elementu macierzy F: r=1, c=1, v=30 \n" << endl << endl;
     F.setv(1, 1, 30.);
     F.print();
     cout << "Metoda get(); dla macierzy F\t" << F.getv(1, 1) << endl << endl;
-    cout << "Zmiana elementow macierzy, dla lepszego zobrazowania dzialania, nowa macierzy F:" << endl;
+    cout << "Zmiana elementow macierzy, dla lepszego zobrazowania dzialania, nowa macierzy F:\n" << endl;
     for (int i = 0; i < F.rows(); i++)
     {
         for (int j = 0; j < F.cols(); j++)
             F.setv(i, j, 5.);
     }
     F.print();
-    cout << "Zmiana elementow macierzy, dla lepszego zobrazowania dzialania, nowa macierz G:" << endl;
+    cout << "Zmiana elementow macierzy, dla lepszego zobrazowania dzialania, nowa macierz G:\n" << endl;
     for (int i = 0; i < G.rows(); i++)
     {
         for (int j = 0; j < G.cols(); j++)
             G.setv(i, j, 7.);
     }
     G.print();
-    cout << "Wynik mnozenia macierzy: " << endl;
-    H.multiply(F, G);
-    H.print();
+    cout << "Wynik mnozenia macierzy F i G: \n" << endl;
+    matrix<double> fileM(F.multiply(G));
+    fileM.print();
     cout << endl << endl;
-    cout << "Wynik dodawania macierzy: " << endl;
-    I.add(F, G);
-    I.print();
-    cout << "Wynik odejmowania macierzy: " << endl;
-    J.subtract(F, G);
-    J.print();
-
+    cout << "Wynik dodawania macierzy F i G: \n" << endl;
+    matrix<double> fileA(F.add(G));
+    fileA.print();
+    cout << "Wynik odejmowania macierzy F i G: \n" << endl;
+    matrix<double> fileS(F.subtract(G));
+    fileS.print();
     F.store("Macierz_F.txt");
     G.store("Macierz_G.txt");
     cout << "-------------------------------------------------------------------------------------" << endl;
@@ -283,32 +325,28 @@ int main()
     matrix<double> K("dane.txt");
     matrix<double> L("dane2.txt");
     matrix<double> M("dane3.txt"); 
-    matrix<double> N(K.n, L.m); 
-    matrix<double> O(K.n, L.m); 
-    matrix<double> P(K.n, L.m); 
-    cout << "Macierz z pliku dane.txt : " << endl;
+    cout << "Macierz z pliku dane.txt : \n" << endl;
     K.print();
-    cout << "Macierz z pliku dane2.txt : " << endl;
+    cout << "Macierz z pliku dane2.txt : \n" << endl;
     L.print();
-    cout << "Macierz z pliku dane3.txt (plik pusty): " << endl;
+    cout << "Macierz z pliku dane3.txt (plik pusty): \n" << endl;
     M.print();
     cout << "Metoda rows(); dla macierzy dane.txt (K)\t" << K.rows() << endl << endl;
     cout << "Metoda cols(); dla macierzy dane.txt (K)\t" << K.cols() << endl << endl;
-    cout << "Wynik mnozenia macierzy: " << endl;
-    N.multiply(K, L);
-    N.print();
+    cout << "Wynik mnozenia macierzy: \n" << endl;
+    matrix<double> multiplyingM(K.multiply(L)); //zly rozmiar - komunikat 
+    multiplyingM.print();
     cout << endl << endl;
-    cout << "Wynik dodawania macierzy: " << endl;
-    O.add(K, L);
-    O.print();
-    cout << "Wynik odejmowania macierzy: " << endl;
-    P.subtract(K, L);
-    P.print();
+    cout << "Wynik dodawania macierzy: \n" << endl;
+    matrix<double> addingM(K.add(L));
+    addingM.print();
+    cout << "Wynik odejmowania macierzy: \n" << endl;
+    matrix<double> subtractingM(K.subtract(L));
+    subtractingM.print();
 
-    N.store("Wynik_mnozenia_macierze_plik.txt");
-    O.store("Wynik_dodawania_macierze_plik.txt");
-    P.store("Wynik_odejmowania_macierze_plik.txt");
-
-  
+    K.store("Macierz_K.txt");
+    L.store("Macierz_L.txt");
+   
     return 0;
 }
+
